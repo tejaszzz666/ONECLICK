@@ -142,7 +142,8 @@ function detectNode(ctx) {
   } else if (scripts.dev) {
     r.start = inferred(run('dev'), 'scripts.dev');
     r.warnings.push('No start script. Falling back to the dev script, which is not production-grade.');
-  } else if (typeof pkg.main === 'string' && ctx.pathHas(pkg.main.replace(/^\.\//, ''))) {
+  } else if (kind && typeof pkg.main === 'string' && ctx.pathHas(pkg.main.replace(/^\.\//, ''))) {
+    // only for recognised app frameworks; a bare `main` is a library entry point, not something to run
     r.start = inferred(`node ${pkg.main.replace(/^\.\//, '')}`, 'package.json main');
   }
 

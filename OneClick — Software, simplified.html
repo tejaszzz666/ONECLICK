@@ -60,6 +60,8 @@ section{padding:18vh clamp(16px,4vw,40px)}
 .kv dt{color:var(--dim);font-size:13px}
 .kv dd{margin:0;word-break:break-word}
 #report .warn{color:var(--sig);font-size:14px;margin:8px 0 0}
+.acts{display:flex;gap:10px;flex-wrap:wrap;margin-top:10px}
+.acts .btn{padding:10px 16px;font-size:14px}
 .final{text-align:center;padding-bottom:22vh}
 .final .big{margin:0 auto 5vh}
 .label{position:fixed;z-index:3;left:0;top:0;font-size:12px;font-weight:500;letter-spacing:.06em;pointer-events:none;color:var(--dim);transform:translate(-50%,-50%);white-space:nowrap;transition:color .2s}
@@ -112,7 +114,7 @@ section{padding:18vh clamp(16px,4vw,40px)}
 <div class="log" id="log" role="log" aria-live="polite" hidden></div>
 <div class="state" id="state" aria-live="polite"></div>
 <div id="report"></div>
-<p class="note">Launch currently reads a public GitHub repository and reports how it would be run. It does not install, build or run anything yet.</p>
+<p class="note">Launch reads a public GitHub repository and reports how it would be run. It does not install, build or run anything itself yet; the report links to free cloud runners.</p>
 </div>
 </section>
 
@@ -145,7 +147,8 @@ const API_BASE=(location.protocol==='file:'||location.hostname==='localhost'||lo
 const logEl=document.getElementById('log'),st=document.getElementById('state'),go=document.getElementById('go'),rep=document.getElementById('report'),urlIn=document.getElementById('url');
 const el=(tag,cls,text)=>{const n=document.createElement(tag);if(cls)n.className=cls;if(text!=null)n.textContent=text;return n};
 const MARK={cmd:'>',ok:'+',warn:'!',err:'x',info:'-'};
-const STATE={READY:'ANALYZED: RUN COMMAND FOUND',PARTIAL:'ANALYZED: PARTIAL',UNKNOWN:'ANALYZED: NOT SUPPORTED'};
+const STATE={READY:'ANALYZED: RUN COMMAND FOUND',PARTIAL:'ANALYZED: PARTIAL',LIBRARY:'ANALYZED: LIBRARY, NOTHING TO LAUNCH',UNKNOWN:'ANALYZED: NOT SUPPORTED'};
+const RUN_URL=/^https:\/\/(stackblitz\.com|codespaces\.new|github\.dev|vercel\.com)\//; // only ever link to the known runner hosts
 function addLog(level,msg){logEl.appendChild(el('div',level,(MARK[level]||'-')+' '+msg));logEl.scrollTop=logEl.scrollHeight}
 fetch(API_BASE+'/api/health').catch(()=>{}); // wakes the free-tier server early
 async function streamAnalyze(url,onEv,signal){
@@ -172,6 +175,11 @@ function renderReport(r){
  kv(dl,'Environment',r.env.vars.length?r.env.vars.map(v=>v.name).join(', '):'None found');
  rep.appendChild(dl);
  r.warnings.forEach(w=>rep.appendChild(el('p','warn','! '+w)));
+ const plan=r.runPlan,opts=((plan&&plan.options)||[]).filter(x=>RUN_URL.test(x.url)),acts=el('div','acts');
+ const intro=plan&&plan.recommended?'Best free way to run it is highlighted. Each option opens a third-party service and uses your own free quota:':r.status==='LIBRARY'?'This is a library, so there is nothing to launch. You can still work with the code:':'No reliable way to run this was found. You can still open the code:';
+ opts.forEach(x=>{const a=el('a','btn'+(x.id===plan.recommended?'':' ghost'),x.label+' \u00b7 '+x.provider+(x.runs?'':' (editor only)'));a.href=x.url;a.target='_blank';a.rel='noopener noreferrer';acts.appendChild(a)});
+ if(opts.length){rep.appendChild(el('p','note',intro));rep.appendChild(acts);
+  opts.forEach(x=>{if(x.id===plan.recommended||x.fit==='maybe')(x.notes||[]).forEach(t=>rep.appendChild(el('p','note',x.provider+': '+t)))})}
  rep.appendChild(el('p','note',r.statusReason+' '+r.execution.reason));
 }
 let busy=false;

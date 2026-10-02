@@ -2,6 +2,7 @@
 
 const { parseRepoUrl } = require('./url');
 const { DETECTORS } = require('./detectors');
+const { planRun } = require('./runners');
 
 class AnalysisError extends Error {
   constructor(code, message, extra) {
@@ -234,6 +235,9 @@ async function analyze(input, { emit = () => {}, source, signal } = {}) {
   if (!primary && !docker.dockerfile && !staticSite) {
     status = 'UNKNOWN';
     statusReason = 'No supported project type was detected.';
+  } else if (primary && primary.projectType === 'Library or package' && !primary.start && !primary.staticOutput) {
+    status = 'LIBRARY';
+    statusReason = 'This is a library or package, not an application. There is no application entry point to launch.';
   } else if (primary && (primary.start || primary.staticOutput)) {
     status = 'READY';
     statusReason = 'Stack and a run command were found. This is an analysis result; the project has not been built or run.';
@@ -246,6 +250,22 @@ async function analyze(input, { emit = () => {}, source, signal } = {}) {
   }
   log(status === 'UNKNOWN' ? 'warn' : 'ok', `Analysis complete: ${status}`);
   stage('done');
+
+  const runPlan = planRun({
+    owner,
+    name: meta.name || repo,
+    canonical: parsed.canonical,
+    ref,
+    explicitRef: parsed.ref || null,
+    root: base || '.',
+    primary,
+    docker,
+    staticSite,
+    envVars,
+    hasDevcontainer: paths.has('.devcontainer/devcontainer.json') || paths.has('.devcontainer.json'),
+  });
+  const best = runPlan.options.find((x) => x.id === runPlan.recommended);
+  if (best) log('ok', `Best free way to run it: ${best.label} (${best.provider}${best.fit === 'maybe' ? ', with caveats' : ''})`);
 
   const cmdOut = (c) => (c ? { cmd: c.cmd, source: c.source, confidence: c.confidence } : null);
   return {
@@ -269,6 +289,7 @@ async function analyze(input, { emit = () => {}, source, signal } = {}) {
     status,
     statusReason,
     execution: { available: false, reason: noExecution },
+    runPlan,
     analyzedAt: new Date().toISOString(),
   };
 }
