@@ -1,6 +1,8 @@
 {
+  "framework": null,
   "buildCommand": "node scripts/build-site.js",
   "outputDirectory": "public",
+  "installCommand": "echo skip",
   "cleanUrls": true,
   "headers": [
     {
