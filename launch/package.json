@@ -1,0 +1,16 @@
+{
+  "name": "oneclick-launch",
+  "version": "0.1.0",
+  "private": true,
+  "description": "ONECLICK Launch API: analyzes public GitHub repositories. Does not clone or execute repository code.",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "dev": "node server.js",
+    "test": "node --test",
+    "analyze": "node scripts/analyze-cli.js"
+  },
+  "engines": {
+    "node": ">=18.17"
+  }
+}

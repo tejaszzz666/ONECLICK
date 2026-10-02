@@ -1,0 +1,18 @@
+services:
+  - type: web
+    name: oneclick-launch
+    runtime: node
+    plan: free
+    rootDir: launch
+    buildCommand: echo "no build step, zero dependencies"
+    startCommand: node server.js
+    healthCheckPath: /api/health
+    envVars:
+      - key: HOST
+        value: 0.0.0.0
+      - key: TRUST_PROXY
+        value: "1"
+      - key: NODE_VERSION
+        value: "22"
+      - key: GITHUB_TOKEN
+        sync: false
