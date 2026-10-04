@@ -1,14 +1,16 @@
 {
   "name": "oneclick-launch",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "private": true,
-  "description": "ONECLICK Launch API: analyzes public GitHub repositories. Does not clone or execute repository code.",
+  "description": "ONECLICK Launch API: analyzes public GitHub repositories. Repository code never runs in this process; the optional Docker sandbox (off by default) runs it in a locked-down container.",
   "main": "server.js",
   "scripts": {
     "start": "node server.js",
     "dev": "node server.js",
     "test": "node --test",
-    "analyze": "node scripts/analyze-cli.js"
+    "analyze": "node scripts/analyze-cli.js",
+    "sandbox:build": "docker build -t oneclick-sandbox:latest sandbox",
+    "sandbox:run": "node scripts/sandbox-cli.js"
   },
   "engines": {
     "node": ">=18.17"

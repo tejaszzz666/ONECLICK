@@ -11,13 +11,13 @@ ONECLICK is an **umbrella software ecosystem**: a set of focused tools that turn
 - One HTML file: inline CSS, vanilla JS, Three.js r128 (cdnjs), Bricolage Grotesque (Google Fonts, 300/500/800)
 - Immersive 3D "product universe": core + rings, six orbiting product nodes, particle field, mouse parallax, scroll dolly, click-to-enter zoom + overlay
 - Scroll sections: hero, two statements, toolbox rows, Launch simulator, closing line
-- **No backend, no build step, no tests, no env vars**
+- Static site (Vercel) + zero-dependency Launch API in `launch/` (Render free tier). No build step for the site. Tests: `cd launch && npm test`
 - Run by opening the HTML file (needs internet for the Three.js CDN and fonts)
 
 ## Products
 | Product | Idea | Status |
 |---|---|---|
-| Launch | GitHub repo → running application | **Simulated preview only** (`RUNNING (simulated)`); no backend |
+| Launch | GitHub repo → running application | **Real analysis** (Render API) plus free runner links. "Run it here" embeds StackBlitz (Node.js only, runs in the visitor's browser tab). ONECLICK servers never execute repo code. Optional local-only Docker sandbox in `launch/sandbox/` (see `docs/FREE_STACK.md`) |
 | Reframe | UI reference → code → editable/reimagined UI | Concept (node + "Coming soon" only) |
 | DevLens | Codebase → interactive visual understanding | Concept |
 | Fix | Error → explanation → actionable fix | Concept |
