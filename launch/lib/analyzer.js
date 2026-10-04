@@ -187,7 +187,11 @@ async function analyze(input, { emit = () => {}, source, signal } = {}) {
     if (primary.framework) log('ok', `${primary.framework.name} detected (${primary.framework.source})`);
     if (primary.packageManager) log('ok', `${primary.packageManager.name} detected (${primary.packageManager.source})`);
     if (found.length > 1) log('info', `Also found: ${found.slice(1).map((f) => f.runtime).join(', ')}`);
-    for (const w of primary.warnings) warn(w);
+    for (const w of primary.warnings) {
+      // a missing lockfile is irrelevant for a library: nobody deploys it, so don't nag
+      if (primary.projectType === 'Library or package' && /^No lockfile found/.test(w)) continue;
+      warn(w);
+    }
   } else if (docker.dockerfile) {
     log('ok', 'Dockerfile found');
   } else if (staticSite) {
@@ -229,7 +233,7 @@ async function analyze(input, { emit = () => {}, source, signal } = {}) {
   log('ok', `${envVars.length} environment variable${envVars.length === 1 ? '' : 's'} referenced (scanned ${toScan.length} of ${candidates.length} source files)`);
 
   // 8. assemble
-  const noExecution = 'Sandboxed execution is not implemented yet. Nothing was installed, built or run.';
+  const noExecution = 'ONECLICK does not run repository code on its own servers; use one of the runners above.';
   let status;
   let statusReason;
   if (!primary && !docker.dockerfile && !staticSite) {
