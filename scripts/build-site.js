@@ -14,3 +14,14 @@ if (!src) {
 fs.mkdirSync(path.join(root, 'public'), { recursive: true });
 fs.copyFileSync(path.join(root, src), path.join(root, 'public', 'index.html'));
 console.log(`Built public/index.html from "${src}"`);
+// extra pages (served without the .html extension thanks to cleanUrls)
+for (const page of ['launch.html']) {
+  const from = path.join(root, page);
+  if (fs.existsSync(from)) {
+    fs.copyFileSync(from, path.join(root, 'public', page));
+    console.log(`Built public/${page}`);
+  } else {
+    console.error(`Missing page: ${page}`);
+    process.exit(1);
+  }
+}

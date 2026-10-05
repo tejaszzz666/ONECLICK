@@ -84,13 +84,13 @@ section{padding:18vh clamp(16px,4vw,40px)}
 </head>
 <body>
 <canvas id="gl" aria-hidden="true"></canvas>
-<nav id="nav"><b>ONECLICK</b><span><a class="hm" href="#toolbox">Products</a><a class="hm" href="#launch">Launch</a><a href="#toolbox">Toolbox</a></span></nav>
+<nav id="nav"><b>ONECLICK</b><span><a class="hm" href="#toolbox">Products</a><a class="hm" href="launch.html" data-go>Launch</a><a href="#toolbox">Toolbox</a></span></nav>
 
 <main>
 <header class="hero">
 <h1>Software, simplified.</h1>
 <p class="lede">A collection of focused tools that turn complicated digital tasks into ridiculously simple actions.</p>
-<div class="btns"><a class="btn" href="#toolbox">Explore products</a><a class="btn ghost" href="#launch">View Launch</a></div>
+<div class="btns"><a class="btn" href="#toolbox">Explore products</a><a class="btn ghost" href="launch.html" data-go>View Launch</a></div>
 <div class="sr" id="nodenav" role="group" aria-label="Products"></div>
 <span class="hint">Hover a tool. Click to enter.</span>
 </header>
@@ -110,13 +110,8 @@ section{padding:18vh clamp(16px,4vw,40px)}
 
 <section id="launch" aria-labelledby="lh">
 <p class="big" id="lh">Don't set up. <span>Launch.</span></p>
-<div class="sim">
-<form id="sf"><input id="url" placeholder="Paste any public GitHub repo, e.g. owner/repo" spellcheck="false" aria-label="Public GitHub repository URL" autocomplete="off"><button class="btn" type="submit" id="go">Analyze</button></form>
-<div class="log" id="log" role="log" aria-live="polite" hidden></div>
-<div class="state" id="state" aria-live="polite"></div>
-<div id="report"></div>
-<p class="note">Launch reads a public GitHub repository and reports how it would be run. ONECLICK servers never install, build or run it. For Node.js projects, StackBlitz can run it in your browser in a new tab (a third-party service); other options open free cloud runners.</p>
-</div>
+<p class="lede" style="margin-top:20px">Paste a public GitHub repository. Launch reads it and shows what it needs and the free way to run it.</p>
+<div class="btns"><a class="btn" href="launch.html" data-go>Open Launch</a></div>
 </section>
 
 <section class="final">
@@ -184,7 +179,7 @@ function renderReport(r){
  rep.appendChild(el('p','note',r.statusReason));
 }
 let busy=false;
-document.getElementById('sf').addEventListener('submit',async e=>{
+document.getElementById('sf')?.addEventListener('submit',async e=>{
  e.preventDefault();if(busy)return;busy=true;go.disabled=true;st.textContent='';rep.replaceChildren();logEl.replaceChildren();logEl.hidden=false;
  const ac=new AbortController(),kill=setTimeout(()=>ac.abort(),90000);let got=false;
  const wake=setTimeout(()=>{if(!got)addLog('info','Waking the server (free hosting). This can take up to a minute.')},3000);
@@ -201,6 +196,9 @@ document.getElementById('sf').addEventListener('submit',async e=>{
 });
 
 // 3D
+// smooth page switch: fade out, then navigate; fade back in on return (bfcache)
+document.addEventListener('click',e=>{const a=e.target.closest('a[data-go]');if(!a||e.metaKey||e.ctrlKey||e.shiftKey||e.button)return;e.preventDefault();document.getElementById('fade').classList.add('on');setTimeout(()=>{location.href=a.href},matchMedia('(prefers-reduced-motion:reduce)').matches?0:320)});
+addEventListener('pageshow',()=>document.getElementById('fade').classList.remove('on'));
 const cv=document.getElementById('gl');
 const reduce=matchMedia('(prefers-reduced-motion:reduce)').matches;
 const small=innerWidth<800;
@@ -241,13 +239,13 @@ const world=document.getElementById('world'),fade=document.getElementById('fade'
 function enter(i){
  if(zoom)return;opener=document.activeElement;zoom={i,t:0};fade.classList.add('on');
  setTimeout(()=>{const p=P[i];document.getElementById('wn').textContent=p.n;document.getElementById('wd').textContent=p.t+'. '+p.q;
-  document.getElementById('ws').textContent=p.live?'Launch can analyze a public GitHub repository on this page. Running it is not built yet.':'Coming soon. This tool is not available yet.';
-  document.getElementById('wgo').textContent=p.live?'Try Launch analysis':'Back to the universe';document.getElementById('wgo').dataset.live=p.live?1:'';
+  document.getElementById('ws').textContent=p.live?'Launch reads a public GitHub repository and shows the free way to run it.':'Coming soon. This tool is not available yet.';
+  document.getElementById('wgo').textContent=p.live?'Open Launch':'Back to the universe';document.getElementById('wgo').dataset.live=p.live?1:'';
   world.classList.add('open');document.getElementById('wgo').focus();fade.classList.remove('on');},600);
 }
 // close the overlay; focus returns to whatever opened it (or the Launch input for the live product)
 function closeWorld(toLaunch){world.classList.remove('open');zoom=null;
- if(toLaunch){document.getElementById('launch').scrollIntoView();document.getElementById('url').focus({preventScroll:true})}
+ if(toLaunch){fade.classList.add('on');setTimeout(()=>{location.href='launch.html'},320);return}
  else if(opener&&opener.isConnected)opener.focus({preventScroll:true});
  opener=null}
 document.getElementById('wgo').onclick=e=>closeWorld(!!e.currentTarget.dataset.live);

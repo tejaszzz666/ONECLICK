@@ -1,0 +1,184 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Launch — ONECLICK</title>
+<meta name="description" content="Paste a public GitHub repository. Launch reads it, tells you what it needs, and shows the free way to run it.">
+<meta name="theme-color" content="#050608">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,300;12..96,500;12..96,800&display=swap" rel="stylesheet">
+<style>
+:root{--bg:#050608;--fg:#eef1f5;--dim:#7d8592;--line:#1c2027;--sig:#ffb347;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
+*,*::before,*::after{box-sizing:inherit}
+html{scroll-behavior:smooth;scroll-padding-top:env(safe-area-inset-top,0px)}
+body{margin:0;background:var(--bg);color:var(--fg);font-family:'Bricolage Grotesque',system-ui,sans-serif;font-weight:300;overflow-x:hidden;animation:pin .7s cubic-bezier(.2,.7,.2,1) both}
+@keyframes pin{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:none}}
+#gl{position:fixed;inset:0;width:100%;height:100%;z-index:0}
+main,nav{position:relative;z-index:2}
+nav{position:fixed;top:env(safe-area-inset-top,0px);left:0;right:0;display:flex;justify-content:space-between;align-items:center;padding:16px clamp(16px,4vw,40px);z-index:5;background:rgba(5,6,8,.72);backdrop-filter:blur(8px)}
+nav b{font-weight:800;letter-spacing:.02em;color:var(--fg);text-decoration:none}
+nav a{color:var(--dim);text-decoration:none;margin-left:22px;font-size:14px}
+nav a:hover,nav a:focus-visible{color:var(--fg)}
+nav a.brand{margin:0;color:var(--fg);font-weight:800;font-size:16px;letter-spacing:.02em}
+a:focus-visible,button:focus-visible,input:focus-visible{outline:2px solid var(--sig);outline-offset:3px}
+#fade{position:fixed;inset:0;background:var(--bg);opacity:0;pointer-events:none;transition:opacity .3s ease;z-index:50}
+#fade.on{opacity:1;pointer-events:all}
+.hero{min-height:100svh;display:flex;flex-direction:column;justify-content:center;padding:14vh clamp(16px,4vw,40px) 8vh}
+h1{font-weight:800;font-size:clamp(44px,9vw,132px);line-height:.92;letter-spacing:-.035em;margin:0 0 20px}
+.lede{max-width:34em;color:var(--dim);font-size:clamp(16px,1.6vw,20px);margin:0 0 28px}
+.btn{font-family:inherit;font-size:15px;font-weight:500;padding:14px 22px;border-radius:999px;border:1px solid var(--fg);background:var(--fg);color:var(--bg);cursor:pointer;text-decoration:none;transition:transform .2s}
+.btn.ghost{background:transparent;color:var(--fg);border-color:#3a414c}
+.btn:hover{transform:translateY(-2px)}
+.btn[disabled]{opacity:.5;cursor:wait}
+.sim{max-width:640px;border:1px solid var(--line);border-radius:14px;padding:22px;background:rgba(10,12,16,.78);backdrop-filter:blur(6px)}
+.sim form{display:flex;gap:10px;flex-wrap:wrap}
+.sim input{flex:1;min-width:200px;background:#0b0d11;border:1px solid #2a303a;color:var(--fg);padding:14px;border-radius:10px;font:inherit}
+.sim input::placeholder{color:var(--dim);opacity:.85}
+.state{margin-top:16px;font-weight:800;font-size:28px;color:var(--sig);min-height:1.2em}
+.note{color:var(--dim);font-size:13px;margin:10px 0 0}
+.log{margin:20px 0 0;max-height:220px;overflow:auto;font:12.5px/1.6 ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;color:var(--dim)}
+.log[hidden]{display:none}
+.log .ok{color:var(--fg)}.log .warn{color:var(--sig)}.log .err{color:#ff8a80}
+.kv{display:grid;grid-template-columns:max-content 1fr;gap:8px 18px;margin:20px 0 0}
+.kv dt{color:var(--dim);font-size:13px}
+.kv dd{margin:0;word-break:break-word}
+#report .warn{color:var(--sig);font-size:14px;margin:8px 0 0}
+.acts{display:flex;gap:10px;flex-wrap:wrap;margin-top:10px}
+.acts .btn{padding:10px 16px;font-size:14px}
+section.how{padding:10vh clamp(16px,4vw,40px)}
+.big{font-weight:800;font-size:clamp(30px,5vw,64px);line-height:1;letter-spacing:-.03em;margin:0 0 5vh;max-width:14em}
+.big span{color:var(--dim)}
+.steps{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:14px;max-width:960px}
+.step{border:1px solid var(--line);border-radius:14px;padding:20px;background:rgba(10,12,16,.7)}
+.step b{display:block;color:var(--sig);font-size:13px;margin-bottom:8px}
+.step p{margin:0;color:var(--dim);font-size:15px;line-height:1.5}
+.step p strong{color:var(--fg);font-weight:500}
+footer{padding:6vh clamp(16px,4vw,40px) 12vh;color:var(--dim);font-size:13px}
+@media(prefers-reduced-motion:reduce){html{scroll-behavior:auto}*{transition:none!important;animation:none!important}}
+</style>
+</head>
+<body>
+<canvas id="gl" aria-hidden="true"></canvas>
+<nav><a class="brand" href="/" data-go>ONECLICK</a><span><a href="/" data-go>Home</a><a href="#how">How it works</a></span></nav>
+
+<main>
+<header class="hero">
+<h1>Launch.</h1>
+<p class="lede">Paste a public GitHub repository. Launch reads it, tells you what it needs, and shows the free way to run it. No setup.</p>
+<div class="sim">
+<form id="sf"><input id="url" placeholder="Paste any public GitHub repo, e.g. owner/repo" spellcheck="false" aria-label="Public GitHub repository URL" autocomplete="off"><button class="btn" type="submit" id="go">Analyze</button></form>
+<div class="log" id="log" role="log" aria-live="polite" hidden></div>
+<div class="state" id="state" aria-live="polite"></div>
+<div id="report"></div>
+<p class="note">Launch reads a public GitHub repository and reports how it would be run. ONECLICK servers never install, build or run it. For Node.js projects, StackBlitz can run it in your browser in a new tab (a third-party service); other options open free cloud runners.</p>
+</div>
+</header>
+
+<section class="how" id="how" aria-labelledby="hw">
+<p class="big" id="hw">Three steps. <span>Zero setup.</span></p>
+<div class="steps">
+<div class="step"><b>1 · PASTE</b><p><strong>Any public GitHub repo.</strong> A full link or just owner/repo.</p></div>
+<div class="step"><b>2 · ANALYZE</b><p><strong>Launch reads it</strong> through GitHub and finds the stack, install, build and start commands, and environment variables.</p></div>
+<div class="step"><b>3 · RUN</b><p><strong>Pick a free runner.</strong> StackBlitz for Node.js, Codespaces for anything else. They open in a new tab on your own free quota.</p></div>
+</div>
+</section>
+<footer>Libraries and packages are reported as "nothing to launch". Private repositories are not supported.</footer>
+</main>
+<div id="fade"></div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script>
+const reduce=matchMedia('(prefers-reduced-motion:reduce)').matches;
+// smooth page switch: fade out, then navigate; fade back in on return (bfcache)
+const fade=document.getElementById('fade');
+document.addEventListener('click',e=>{const a=e.target.closest('a[data-go]');if(!a||e.metaKey||e.ctrlKey||e.shiftKey||e.button)return;e.preventDefault();fade.classList.add('on');setTimeout(()=>{location.href=a.href},reduce?0:320)});
+addEventListener('pageshow',()=>fade.classList.remove('on'));
+
+// background: the same core as the home page, calmer
+(function(){
+ if(!window.THREE)return;
+ const cv=document.getElementById('gl'),small=innerWidth<800;
+ const R=new THREE.WebGLRenderer({canvas:cv,antialias:!small});R.setPixelRatio(Math.min(devicePixelRatio,small?1.5:2));R.setClearColor(0x050608);
+ const sc=new THREE.Scene();sc.fog=new THREE.FogExp2(0x050608,.055);
+ const cam=new THREE.PerspectiveCamera(50,1,.1,100);cam.position.set(0,.4,8);
+ const core=new THREE.Group();sc.add(core);
+ const wire=(c,o)=>new THREE.MeshBasicMaterial({color:c,wireframe:true,transparent:true,opacity:o});
+ core.add(new THREE.Mesh(new THREE.IcosahedronGeometry(1.1,1),wire(0xdfe6ee,.35)));
+ const inner=new THREE.Mesh(new THREE.OctahedronGeometry(.5),wire(0xffb347,.9));core.add(inner);
+ const rings=[0,1,2].map(i=>{const r=new THREE.Mesh(new THREE.TorusGeometry(1.6+i*.3,.006,6,120),new THREE.MeshBasicMaterial({color:0x8a94a3,transparent:true,opacity:.35}));r.rotation.x=1+i*.6;core.add(r);return r});
+ const N=small?300:800,pp=new Float32Array(N*3);for(let i=0;i<N*3;i++)pp[i]=(Math.random()-.5)*28;
+ const pg=new THREE.BufferGeometry();pg.setAttribute('position',new THREE.BufferAttribute(pp,3));
+ const pts=new THREE.Points(pg,new THREE.PointsMaterial({color:0x8a94a3,size:.03,transparent:true,opacity:.7}));sc.add(pts);
+ const mouse={x:0,y:0};addEventListener('pointermove',e=>{mouse.x=e.clientX/innerWidth*2-1;mouse.y=-(e.clientY/innerHeight)*2+1});
+ function size(){R.setSize(innerWidth,innerHeight,false);cam.aspect=innerWidth/innerHeight;cam.updateProjectionMatrix();core.position.x=innerWidth>900?3.4:0;core.position.y=innerWidth>900?0:2.4;core.scale.setScalar(innerWidth>900?1:.8)}
+ addEventListener('resize',size);size();
+ const clock=new THREE.Clock();
+ (function tick(){requestAnimationFrame(tick);if(document.hidden)return;
+  const dt=Math.min(clock.getDelta(),.05),t=clock.elapsedTime,k=reduce?0:1;
+  core.rotation.y+=dt*.15*k;inner.rotation.y-=dt*.6*k;inner.scale.setScalar(1+Math.sin(t*2)*.05*k);
+  rings.forEach((r,i)=>{r.rotation.z+=dt*(.1+i*.05)*k});pts.rotation.y+=dt*.01*k;
+  cam.position.x+=((mouse.x*1.1)-cam.position.x)*.05;cam.position.y+=((.4+mouse.y*.6)-cam.position.y)*.05;cam.lookAt(0,0,0);
+  R.render(sc,cam)})();
+})();
+
+// launch analysis: real and read-only. Nothing is installed, built or run.
+const API_BASE=(location.protocol==='file:'||location.hostname==='localhost'||location.hostname==='127.0.0.1')?'http://127.0.0.1:8787':'https://oneclick-launch.onrender.com';
+const logEl=document.getElementById('log'),st=document.getElementById('state'),go=document.getElementById('go'),rep=document.getElementById('report'),urlIn=document.getElementById('url');
+const el=(tag,cls,text)=>{const n=document.createElement(tag);if(cls)n.className=cls;if(text!=null)n.textContent=text;return n};
+const MARK={cmd:'>',ok:'+',warn:'!',err:'x',info:'-'};
+const STATE={READY:'ANALYZED: RUN COMMAND FOUND',PARTIAL:'ANALYZED: PARTIAL',LIBRARY:'ANALYZED: LIBRARY, NOTHING TO LAUNCH',UNKNOWN:'ANALYZED: NOT SUPPORTED'};
+const RUN_URL=/^https:\/\/(stackblitz\.com|codespaces\.new|github\.dev|vercel\.com)\//; // only ever link to the known runner hosts
+function addLog(level,msg){logEl.appendChild(el('div',level,(MARK[level]||'-')+' '+msg));logEl.scrollTop=logEl.scrollHeight}
+fetch(API_BASE+'/api/health').catch(()=>{}); // wakes the free-tier server early
+async function streamAnalyze(url,onEv,signal){
+ const res=await fetch(API_BASE+'/api/analyze/stream?url='+encodeURIComponent(url),{signal});
+ if(!res.ok){let m='Request failed ('+res.status+').';try{m=(await res.json()).error.message}catch{}throw new Error(m)}
+ const rd=res.body.getReader(),dec=new TextDecoder();let buf='';
+ for(;;){const {done,value}=await rd.read();if(done)break;buf+=dec.decode(value,{stream:true});
+  let i;while((i=buf.indexOf('\n\n'))>=0){const blk=buf.slice(0,i);buf=buf.slice(i+2);
+   let ev='message',data='';for(const l of blk.split('\n')){if(l.startsWith('event:'))ev=l.slice(6).trim();else if(l.startsWith('data:'))data+=l.slice(5).trim()}
+   if(data)onEv(ev,JSON.parse(data))}}
+}
+function kv(dl,k,v){if(v==null||v==='')return;dl.appendChild(el('dt',null,k));dl.appendChild(el('dd',null,v))}
+const cmd=c=>c?c.cmd+' ('+c.confidence+')':null;
+function renderReport(r){
+ rep.replaceChildren();const dl=el('dl','kv');
+ kv(dl,'Repository',r.repo.owner+'/'+r.repo.name+' @ '+r.repo.branch);
+ kv(dl,'Stack',[r.language,r.framework&&r.framework.name].filter(Boolean).join(' \u00b7 ')||'Not detected');
+ kv(dl,'Type',r.projectType);
+ kv(dl,'Package manager',r.packageManager&&r.packageManager.name);
+ kv(dl,'Runtime version',r.runtimeVersion&&r.runtimeVersion.value);
+ kv(dl,'Install',cmd(r.commands.install));
+ kv(dl,'Build',cmd(r.commands.build));
+ kv(dl,'Start',cmd(r.commands.start)||(r.staticOutput?'Static output: '+r.staticOutput:null));
+ kv(dl,'Environment',r.env.vars.length?r.env.vars.map(v=>v.name).join(', '):'None found');
+ rep.appendChild(dl);
+ r.warnings.forEach(w=>rep.appendChild(el('p','warn','! '+w)));
+ const plan=r.runPlan,opts=((plan&&plan.options)||[]).filter(x=>RUN_URL.test(x.url)),acts=el('div','acts');
+ const intro=plan&&plan.recommended?'Best free way to run it is highlighted. Each option opens a third-party service and uses your own free quota:':r.status==='LIBRARY'?'This is a library, so there is nothing to launch. You can still work with the code:':'No reliable way to run this was found. You can still open the code:';
+ opts.forEach(x=>{const a=el('a','btn'+(x.id===plan.recommended?'':' ghost'),x.label+' \u00b7 '+x.provider+(x.runs?'':' (editor only)'));a.href=x.url;a.target='_blank';a.rel='noopener noreferrer';acts.appendChild(a)});
+ if(opts.length){rep.appendChild(el('p','note',intro));rep.appendChild(acts);
+  opts.forEach(x=>{if(x.id===plan.recommended||x.fit==='maybe')(x.notes||[]).forEach(t=>rep.appendChild(el('p','note',x.provider+': '+t)))})}
+ rep.appendChild(el('p','note',r.statusReason));
+}
+let busy=false;
+document.getElementById('sf').addEventListener('submit',async e=>{
+ e.preventDefault();if(busy)return;busy=true;go.disabled=true;st.textContent='';rep.replaceChildren();logEl.replaceChildren();logEl.hidden=false;
+ const ac=new AbortController(),kill=setTimeout(()=>ac.abort(),90000);let got=false;
+ const wake=setTimeout(()=>{if(!got)addLog('info','Waking the server (free hosting). This can take up to a minute.')},3000);
+ try{
+  await streamAnalyze(urlIn.value,(ev,d)=>{got=true;
+   if(ev==='log')addLog(d.level,d.msg);
+   else if(ev==='result'){renderReport(d);st.textContent=STATE[d.status]||'ANALYZED'}
+   else if(ev==='error'){st.textContent='COULD NOT ANALYZE';if(!logEl.querySelector('.err'))addLog('err',d.message)}
+  },ac.signal);
+ }catch(err){
+  st.textContent='COULD NOT ANALYZE';
+  addLog('err',ac.signal.aborted?'The server took too long to respond. Try again in a minute.':(err instanceof TypeError?'Could not reach the Launch server. Try again in a minute.':err.message));
+ }finally{clearTimeout(kill);clearTimeout(wake);busy=false;go.disabled=false}
+});
+</script>
+</body>
+</html>
