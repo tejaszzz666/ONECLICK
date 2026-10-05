@@ -88,7 +88,7 @@ test('run plan: static site, unknown repo, electron, and github.dev honesty', as
   const s = await run({ 'index.html': '<html></html>' });
   assert.ok(opt(s, 'vercel'));
   assert.equal(opt(s, 'stackblitz'), undefined);
-  assert.equal(s.runPlan.recommended, 'vercel');
+  assert.equal(s.runPlan.recommended, 'preview'); // a plain static page opens directly (see static-demo.test.js)
 
   const u = await run({ 'notes.txt': 'hello' });
   assert.equal(opt(u, 'codespaces').fit, 'maybe');
@@ -112,9 +112,10 @@ test('library: honest status, no start command, no best option', async () => {
   assert.equal(r.entryPoint.path, 'index.js');
 });
 
-test('static site: not claimed when a manifest exists, and root manifests resolve', async () => {
+test('static site: a library with a root demo page is previewable; a nested index.html alone is not claimed', async () => {
+  // by design (particles.js case): a package that also ships index.html at its root counts as a static demo
   const withManifest = await run({ 'index.html': '<html></html>', 'package.json': pkg({ name: 'x', scripts: { test: 'x' } }) });
-  assert.notEqual(withManifest.projectType, 'Static site');
+  assert.equal(withManifest.projectType, 'Static site');
   assert.equal(withManifest.project.root, '.');
   const nested = await run({ 'docs/index.html': '<html></html>', 'README.md': 'hi' });
   assert.notEqual(nested.projectType, 'Static site');

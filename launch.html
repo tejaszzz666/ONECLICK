@@ -56,6 +56,26 @@ section.how{padding:10vh clamp(16px,4vw,40px)}
 .step p{margin:0;color:var(--dim);font-size:15px;line-height:1.5}
 .step p strong{color:var(--fg);font-weight:500}
 footer{padding:6vh clamp(16px,4vw,40px) 12vh;color:var(--dim);font-size:13px}
+.opt{border:1px solid var(--line);border-radius:14px;padding:16px;margin-top:12px;background:rgba(5,6,8,.55)}
+.opt.best{border-color:rgba(255,179,71,.55)}
+.opt .acts{margin-top:0}
+.opt .note{margin:8px 0 0}
+.blk{font-size:13.5px;line-height:1.5;margin:8px 0 0;color:var(--dim)}
+.blk strong{font-weight:500}
+.blk.blocks strong{color:#ff8a80}
+.blk.limits strong{color:var(--sig)}
+.blk.needs strong{color:var(--fg)}
+.term{margin-top:12px}
+.cmdrow{display:flex;gap:8px;align-items:center;margin:6px 0 0}
+.cmdrow code{flex:1;min-width:0;overflow-x:auto;white-space:nowrap;background:#0b0d11;border:1px solid #2a303a;border-radius:8px;padding:8px 10px;font:12.5px ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;color:var(--fg)}
+.cmdrow .tag{font-size:12px;color:var(--dim);white-space:nowrap}
+.copy{font:inherit;font-size:12.5px;padding:7px 12px;border-radius:999px;border:1px solid #3a414c;background:transparent;color:var(--fg);cursor:pointer}
+.copy:hover{border-color:var(--fg)}
+details.fail{margin-top:12px;font-size:13.5px;line-height:1.5;color:var(--dim)}
+details.fail summary{cursor:pointer;color:var(--fg)}
+details.fail summary:focus-visible{outline:2px solid var(--sig);outline-offset:3px}
+details.fail .c{color:var(--fg);margin:10px 0 0;font-weight:500}
+details.fail .f{margin:2px 0 0}
 @media(prefers-reduced-motion:reduce){html{scroll-behavior:auto}*{transition:none!important;animation:none!important}}
 </style>
 </head>
@@ -143,6 +163,23 @@ async function streamAnalyze(url,onEv,signal){
 }
 function kv(dl,k,v){if(v==null||v==='')return;dl.appendChild(el('dt',null,k));dl.appendChild(el('dd',null,v))}
 const cmd=c=>c?c.cmd+' ('+c.confidence+')':null;
+const SEV={blocks:'Will not work here',limits:'May not work fully',needs:'You need to supply'};
+function copyBtn(text,label='Copy'){const b=el('button','copy',label);b.type='button';b.setAttribute('aria-label',label==='Copy'?'Copy to clipboard':label);
+ b.addEventListener('click',async()=>{try{await navigator.clipboard.writeText(text);b.textContent='Copied'}catch{b.textContent='Copy failed'}setTimeout(()=>{b.textContent=label},1600)});return b}
+function optionCard(x,best){
+ const card=el('div','opt'+(best?' best':'')),acts=el('div','acts'),a=el('a','btn'+(best?'':' ghost'),x.label+' \u00b7 '+x.provider+(x.runs?'':' (editor only)'));
+ a.href=x.url;a.target='_blank';a.rel='noopener noreferrer';acts.appendChild(a);card.appendChild(acts);
+ if(x.about)card.appendChild(el('p','note',x.about));
+ (x.blockers||[]).forEach(b=>{const p=el('p','blk '+(SEV[b.severity]?b.severity:'limits'));p.appendChild(el('strong',null,(SEV[b.severity]||'Note')+': '));p.appendChild(document.createTextNode(b.message));card.appendChild(p)});
+ const t=x.terminal;
+ if(t&&t.steps&&t.steps.length){const box=el('div','term');
+  box.appendChild(el('p','note','This only opens the machine; it does not start the app. When it is ready, run these in its terminal'+(t.cwd&&t.cwd!=='.'?' (in the "'+t.cwd+'" folder)':'')+'. They come from the repository\u2019s own files, so read them first:'));
+  t.steps.forEach(s=>{const row=el('div','cmdrow');row.appendChild(el('code',null,s.cmd));row.appendChild(el('span','tag',s.confidence==='inferred'?'guessed':'from repo'));row.appendChild(copyBtn(s.cmd));box.appendChild(row)});
+  card.appendChild(box)}
+ if(x.ifItFails&&x.ifItFails.length){const d=el('details','fail');d.appendChild(el('summary',null,"If it doesn't work"));
+  d.appendChild(el('p','f','These are known limits of '+x.provider+', based on this repository\u2019s files. Launch cannot see what happens after you leave this page.'));
+  x.ifItFails.forEach(f=>{d.appendChild(el('p','c',f.cause));d.appendChild(el('p','f',f.fix))});card.appendChild(d)}
+ return card}
 function renderReport(r){
  rep.replaceChildren();const dl=el('dl','kv');
  kv(dl,'Repository',r.repo.owner+'/'+r.repo.name+' @ '+r.repo.branch);
@@ -156,12 +193,12 @@ function renderReport(r){
  kv(dl,'Environment',r.env.vars.length?r.env.vars.map(v=>v.name).join(', '):'None found');
  rep.appendChild(dl);
  r.warnings.forEach(w=>rep.appendChild(el('p','warn','! '+w)));
- const plan=r.runPlan,opts=((plan&&plan.options)||[]).filter(x=>RUN_URL.test(x.url)),acts=el('div','acts');
- const intro=plan&&plan.recommended?'Best free way to run it is highlighted. Each option opens a third-party service and uses your own free quota:':r.status==='LIBRARY'?'This is a library, so there is nothing to launch. You can still work with the code:':'No reliable way to run this was found. You can still open the code:';
- opts.forEach(x=>{const a=el('a','btn'+(x.id===plan.recommended?'':' ghost'),x.label+' \u00b7 '+x.provider+(x.runs?'':' (editor only)'));a.href=x.url;a.target='_blank';a.rel='noopener noreferrer';acts.appendChild(a)});
- if(opts.length){rep.appendChild(el('p','note',intro));rep.appendChild(acts);
-  opts.forEach(x=>{if(x.id===plan.recommended||x.fit==='maybe')(x.notes||[]).forEach(t=>rep.appendChild(el('p','note',x.provider+': '+t)))})}
+ const plan=r.runPlan,opts=((plan&&plan.options)||[]).filter(x=>RUN_URL.test(x.url));
+ const intro=plan&&plan.recommended?'Each option opens a third-party service and uses your own free quota. The suggested one has the amber outline. Anything Launch found that could stop an option from working is listed under it:':r.status==='LIBRARY'?'This is a library, so there is nothing to launch. You can still work with the code:':'No reliable way to run this was found. You can still open the code:';
+ if(opts.length){rep.appendChild(el('p','note',intro));
+  opts.filter(x=>x.id===plan.recommended).concat(opts.filter(x=>x.id!==plan.recommended)).forEach(x=>rep.appendChild(optionCard(x,x.id===plan.recommended)))}
  rep.appendChild(el('p','note',r.statusReason));
+ if(location.protocol!=='file:'){const row=el('div','acts');row.appendChild(copyBtn(location.href.split(/[?#]/)[0]+'?repo='+encodeURIComponent(urlIn.value.trim()||r.repo.owner+'/'+r.repo.name),'Copy link to this analysis'));rep.appendChild(row)}
 }
 let busy=false;
 document.getElementById('sf').addEventListener('submit',async e=>{
@@ -179,6 +216,8 @@ document.getElementById('sf').addEventListener('submit',async e=>{
   addLog('err',ac.signal.aborted?'The server took too long to respond. Try again in a minute.':(err instanceof TypeError?'Could not reach the Launch server. Try again in a minute.':err.message));
  }finally{clearTimeout(kill);clearTimeout(wake);busy=false;go.disabled=false}
 });
+// shared link: launch.html?repo=owner/repo runs the analysis on load (the server validates the input)
+(function(){const q=new URLSearchParams(location.search).get('repo');if(q&&q.length<=200){urlIn.value=q;document.getElementById('sf').requestSubmit()}})();
 </script>
 </body>
 </html>

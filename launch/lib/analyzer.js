@@ -3,6 +3,7 @@
 const { parseRepoUrl } = require('./url');
 const { DETECTORS } = require('./detectors');
 const { planRun } = require('./runners');
+const { checkPreviewHtml } = require('./preview');
 
 class AnalysisError extends Error {
   constructor(code, message, extra) {
@@ -250,6 +251,14 @@ async function analyze(input, { emit = () => {}, source, signal } = {}) {
   if (demoPage) previewPath = demoPage;
   else if (staticSite && !primary) previewPath = 'index.html';
 
+  // Read the page itself (small, read-only) so the preview option can name concrete problems up front.
+  let previewIssues = [];
+  if (previewPath) {
+    const html = await source.getFile(owner, repo, ref, at(previewPath), 100000);
+    previewIssues = checkPreviewHtml(html);
+    for (const i of previewIssues) log('warn', i.message);
+  }
+
   // 8. assemble
   const noExecution = 'ONECLICK does not run repository code on its own servers; use one of the runners above.';
   let status;
@@ -277,6 +286,7 @@ async function analyze(input, { emit = () => {}, source, signal } = {}) {
 
   const runPlan = planRun({
     previewPath,
+    previewIssues,
     owner,
     name: meta.name || repo,
     canonical: parsed.canonical,
