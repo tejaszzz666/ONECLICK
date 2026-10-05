@@ -128,8 +128,8 @@ const API_BASE=(location.protocol==='file:'||location.hostname==='localhost'||lo
 const logEl=document.getElementById('log'),st=document.getElementById('state'),go=document.getElementById('go'),rep=document.getElementById('report'),urlIn=document.getElementById('url');
 const el=(tag,cls,text)=>{const n=document.createElement(tag);if(cls)n.className=cls;if(text!=null)n.textContent=text;return n};
 const MARK={cmd:'>',ok:'+',warn:'!',err:'x',info:'-'};
-const STATE={READY:'ANALYZED: RUN COMMAND FOUND',PARTIAL:'ANALYZED: PARTIAL',LIBRARY:'ANALYZED: LIBRARY, NOTHING TO LAUNCH',UNKNOWN:'ANALYZED: NOT SUPPORTED'};
-const RUN_URL=/^https:\/\/(stackblitz\.com|codespaces\.new|github\.dev|vercel\.com)\//; // only ever link to the known runner hosts
+const STATE={READY:'ANALYZED: READY TO RUN',PARTIAL:'ANALYZED: PARTIAL',LIBRARY:'ANALYZED: LIBRARY, NOTHING TO LAUNCH',UNKNOWN:'ANALYZED: NOT SUPPORTED'};
+const RUN_URL=/^https:\/\/(stackblitz\.com|codespaces\.new|github\.dev|vercel\.com|raw\.githack\.com)\//; // only ever link to the known runner hosts
 function addLog(level,msg){logEl.appendChild(el('div',level,(MARK[level]||'-')+' '+msg));logEl.scrollTop=logEl.scrollHeight}
 fetch(API_BASE+'/api/health').catch(()=>{}); // wakes the free-tier server early
 async function streamAnalyze(url,onEv,signal){

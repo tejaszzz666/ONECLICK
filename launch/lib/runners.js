@@ -25,7 +25,7 @@ const SERVICES = {
 const SECRET_RE = /(DATABASE|DB_|MONGO|REDIS|POSTGRES|MYSQL|SECRET|API_KEY|TOKEN|PASSWORD|PRIVATE_KEY)/i;
 const seg = (s) => String(s).split('/').map(encodeURIComponent).join('/');
 
-function planRun({ owner, name, canonical, ref, explicitRef, root, primary, docker, staticSite, envVars, hasDevcontainer }) {
+function planRun({ previewPath, owner, name, canonical, ref, explicitRef, root, primary, docker, staticSite, envVars, hasDevcontainer }) {
   const o = encodeURIComponent(owner);
   const n = encodeURIComponent(name);
   const sub = root && root !== '.' ? root : '';
@@ -49,8 +49,24 @@ function planRun({ owner, name, canonical, ref, explicitRef, root, primary, dock
   }
   const options = [];
 
+  // 0. plain static pages committed to the repo: open the page itself through a service that serves
+  //    GitHub files with the right content types (no build, no account, no in-browser server)
+  if (previewPath) {
+    const segs = [ref, ...(sub ? sub.split('/') : []), ...previewPath.split('/')].map(seg).join('/');
+    options.push({
+      id: 'preview',
+      label: 'Open the page now',
+      provider: 'raw.githack.com',
+      kind: 'preview',
+      runs: true,
+      fit: 'good',
+      url: `https://raw.githack.com/${o}/${n}/${segs}`,
+      notes: ['Opens the repository\'s own HTML page directly. Free, no account. Pages that need a build step or a server will not work here.'],
+    });
+  }
+
   // 1. in-browser (StackBlitz WebContainers): Node.js only
-  if (isNode && !isLib) {
+  if (isNode && !isLib && !(previewPath && !primary.start && !primary.build)) {
     const notes = [];
     let fit = 'good';
     const demote = (msg) => {
@@ -130,7 +146,7 @@ function planRun({ owner, name, canonical, ref, explicitRef, root, primary, dock
   });
 
   const list = options;
-  const rank = ['stackblitz', 'vercel', 'codespaces'];
+  const rank = ['preview', 'stackblitz', 'vercel', 'codespaces'];
   const byRank = list.filter((x) => x.runs).sort((a, b) => rank.indexOf(a.id) - rank.indexOf(b.id));
   const best = isLib ? null : byRank.find((x) => x.fit === 'good') || byRank[0] || null;
   return { recommended: best ? best.id : null, options: list };

@@ -232,6 +232,24 @@ async function analyze(input, { emit = () => {}, source, signal } = {}) {
   const envVars = [...envMap.values()].sort((a, b) => a.name.localeCompare(b.name)).slice(0, 100);
   log('ok', `${envVars.length} environment variable${envVars.length === 1 ? '' : 's'} referenced (scanned ${toScan.length} of ${candidates.length} source files)`);
 
+  // A library that also ships a plain browser demo page is really a runnable static page.
+  let previewPath = null;
+  let demoPage = null;
+  if (primary && primary.projectType === 'Library or package' && !primary.start && !primary.staticOutput) {
+    for (const d of ['', 'demo', 'docs', 'example', 'examples']) {
+      const full = at(d ? `${d}/index.html` : 'index.html');
+      if (paths.has(full)) {
+        demoPage = rel(full);
+        primary.staticOutput = d || '.';
+        primary.projectType = 'Static site';
+        log('ok', `Browser demo page found: ${demoPage}`);
+        break;
+      }
+    }
+  }
+  if (demoPage) previewPath = demoPage;
+  else if (staticSite && !primary) previewPath = 'index.html';
+
   // 8. assemble
   const noExecution = 'ONECLICK does not run repository code on its own servers; use one of the runners above.';
   let status;
@@ -244,7 +262,9 @@ async function analyze(input, { emit = () => {}, source, signal } = {}) {
     statusReason = 'This is a library or package, not an application. There is no application entry point to launch.';
   } else if (primary && (primary.start || primary.staticOutput)) {
     status = 'READY';
-    statusReason = 'Stack and a run command were found. This is an analysis result; the project has not been built or run.';
+    statusReason = demoPage
+      ? `This package also ships a browser demo page (${demoPage}). It can be opened as a static page. This is an analysis result; nothing was built or run.`
+      : 'Stack and a run command were found. This is an analysis result; the project has not been built or run.';
   } else if (docker.dockerfile || staticSite) {
     status = 'READY';
     statusReason = staticSite ? 'Static site: index.html found. This is an analysis result only.' : 'A Dockerfile was found. This is an analysis result; the image has not been built.';
@@ -256,6 +276,7 @@ async function analyze(input, { emit = () => {}, source, signal } = {}) {
   stage('done');
 
   const runPlan = planRun({
+    previewPath,
     owner,
     name: meta.name || repo,
     canonical: parsed.canonical,
