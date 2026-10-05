@@ -14,6 +14,8 @@ function parseRepoUrl(input) {
   let s = input.trim();
   if (!s) return fail('Enter a GitHub repository URL.');
   if (s.length > 300) return fail('That URL is too long.');
+  // shorthand: "owner/repo" means github.com/owner/repo (first part has no dot, so real hostnames never match)
+  if (/^[A-Za-z0-9][A-Za-z0-9-]*\/[A-Za-z0-9._-]+$/.test(s)) s = 'github.com/' + s;
   if (!/^https?:\/\//i.test(s)) s = 'https://' + s;
 
   let u;

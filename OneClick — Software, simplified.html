@@ -64,6 +64,7 @@ section{padding:18vh clamp(16px,4vw,40px)}
 #report .embar{display:flex;gap:12px;align-items:center;justify-content:space-between;flex-wrap:wrap;padding:10px 14px;border-bottom:1px solid var(--line);font-size:13px;color:var(--dim)}
 #report .embar .btn{padding:6px 14px;font-size:13px}
 #report .embed iframe{display:block;width:100%;height:560px;border:0;background:#0b0d11}
+#url::placeholder{color:var(--dim);opacity:.85}
 .acts{display:flex;gap:10px;flex-wrap:wrap;margin-top:10px}
 .acts .btn{padding:10px 16px;font-size:14px}
 .final{text-align:center;padding-bottom:22vh}
@@ -114,7 +115,7 @@ section{padding:18vh clamp(16px,4vw,40px)}
 <section id="launch" aria-labelledby="lh">
 <p class="big" id="lh">Don't set up. <span>Launch.</span></p>
 <div class="sim">
-<form id="sf"><input id="url" value="https://github.com/expressjs/express" aria-label="Public GitHub repository URL" autocomplete="off"><button class="btn" type="submit" id="go">Analyze</button></form>
+<form id="sf"><input id="url" placeholder="Paste any public GitHub repo, e.g. owner/repo" spellcheck="false" aria-label="Public GitHub repository URL" autocomplete="off"><button class="btn" type="submit" id="go">Analyze</button></form>
 <div class="log" id="log" role="log" aria-live="polite" hidden></div>
 <div class="state" id="state" aria-live="polite"></div>
 <div id="report"></div>
@@ -169,12 +170,17 @@ const cmd=c=>c?c.cmd+' ('+c.confidence+')':null;
 const EMBED_URL=/^https:\/\/stackblitz\.com\/github\//; // only StackBlitz GitHub imports may be embedded
 function embedRun(x,opener){
  const old=document.getElementById('embed');if(old)old.remove();
+ const oldn=document.getElementById('embnote');if(oldn)oldn.remove();
+ if(!window.crossOriginIsolated){ // the in-browser runner cannot start without isolation (local file, Safari, missing headers)
+  window.open(x.url,'_blank','noopener,noreferrer');
+  const n=el('p','note','This page cannot host the runner inline here (it needs a Chromium or Firefox browser on the live site, not a local file), so StackBlitz was opened in a new tab.');n.id='embnote';rep.appendChild(n);return}
  const box=el('div','embed');box.id='embed';box.tabIndex=-1;
  const bar=el('div','embar');
  bar.appendChild(el('span',null,'Running in StackBlitz, inside your browser tab. Nothing runs on ONECLICK servers. Works best in Chrome or Edge.'));
  const close=el('button','btn ghost','Close');close.type='button';
  close.onclick=()=>{box.remove();if(opener)opener.focus()};
- bar.appendChild(close);
+ const nt=el('a','btn ghost','Stuck? Open in a new tab');nt.href=x.url;nt.target='_blank';nt.rel='noopener noreferrer';
+ bar.appendChild(nt);bar.appendChild(close);
  const f=document.createElement('iframe');
  f.src=x.url+(x.url.indexOf('?')<0?'?':'&')+'embed=1&hideNavigation=1';
  f.title='StackBlitz runner';f.loading='lazy';f.allow='cross-origin-isolated; clipboard-write';
@@ -202,7 +208,7 @@ function renderReport(r){
  opts.forEach(x=>{const a=el('a','btn'+(x.id===plan.recommended&&!(sb&&x.id==='stackblitz')?'':' ghost'),x.label+' \u00b7 '+x.provider+(x.runs?'':' (editor only)'));a.href=x.url;a.target='_blank';a.rel='noopener noreferrer';acts.appendChild(a)});
  if(opts.length){rep.appendChild(el('p','note',intro));rep.appendChild(acts);
   opts.forEach(x=>{if(x.id===plan.recommended||x.fit==='maybe')(x.notes||[]).forEach(t=>rep.appendChild(el('p','note',x.provider+': '+t)))})}
- rep.appendChild(el('p','note',r.statusReason+' '+r.execution.reason));
+ rep.appendChild(el('p','note',r.statusReason));
 }
 let busy=false;
 document.getElementById('sf').addEventListener('submit',async e=>{
