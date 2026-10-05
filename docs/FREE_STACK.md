@@ -10,7 +10,7 @@ mode only**, not part of the free deployment.
 
 | Product | Where it runs (free) | Needs | Status |
 |---|---|---|---|
-| **Launch** | Analysis: Render API + GitHub API. Running: StackBlitz embed (visitor's browser, Node.js only), GitHub Codespaces (visitor's own quota, any stack), Vercel deploy (visitor's account). | `GITHUB_TOKEN` on Render | Analysis + runner links + inline StackBlitz embed built. Python, native modules and databases are Codespaces-only. |
+| **Launch** | Analysis: Render API + GitHub API. Running: links that open StackBlitz (Node.js, in the visitor's browser), GitHub Codespaces (visitor's own quota, any stack) or a Vercel deploy (visitor's account), each in a new tab. | `GITHUB_TOKEN` on Render | Analysis + runner links built. Inline embedding was tried and dropped (see below). Python, native modules and databases are Codespaces-only. |
 | **Convert** | 100% in the page: FileReader, canvas, CompressionStream, small JS libs. | nothing | Not built. **Best next build**: zero server, zero cost. |
 | **API** | Inference and docs in the page (JSON/CSV to schema, OpenAPI file, docs). A *hosted* mock endpoint needs storage; free options are an in-memory, expiring mock on the Render API, or a downloadable mock server. | optional Render route | Not built. |
 | **DevLens** | Render API reads the repo tree through the GitHub API and parses imports (JS/TS, Python first); the existing Three.js scene draws the graph. Cap files and bytes per request. | `GITHUB_TOKEN` | Not built. Reuses Launch's GitHub client. |
@@ -21,5 +21,6 @@ mode only**, not part of the free deployment.
 - StackBlitz needs a Chromium browser for the best experience and cannot run native Node modules or
   Python. Free-tier terms of third parties can change; check them before depending on them commercially.
 - Codespaces needs the visitor to have a GitHub account.
-- The inline StackBlitz embed has not been tested in a real browser by the assistant that wrote it.
-  Verify it on the deployed site (Chrome and Firefox) before announcing it.
+- Inline StackBlitz embedding does not work reliably: StackBlitz's own tracker has open reports of the
+  "embedded without proper isolation headers" error even on correctly isolated pages. Do not retry it
+  without checking those issues first (stackblitz/webcontainer-core #2045, stackblitz/sdk #37).

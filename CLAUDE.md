@@ -17,7 +17,7 @@ ONECLICK is an **umbrella software ecosystem**: a set of focused tools that turn
 ## Products
 | Product | Idea | Status |
 |---|---|---|
-| Launch | GitHub repo → running application | **Real analysis** (Render API) plus free runner links. "Run it here" embeds StackBlitz (Node.js only, runs in the visitor's browser tab). ONECLICK servers never execute repo code. Optional local-only Docker sandbox in `launch/sandbox/` (see `docs/FREE_STACK.md`) |
+| Launch | GitHub repo → running application | **Real analysis** (Render API) plus free runner links (StackBlitz for Node.js, Codespaces for any stack, Vercel deploy). Each opens a third-party service in a new tab. Inline embedding of StackBlitz was tried and abandoned: it fails even with correct isolation headers. ONECLICK servers never execute repo code. Optional local-only Docker sandbox in `launch/sandbox/` (see `docs/FREE_STACK.md`) |
 | Reframe | UI reference → code → editable/reimagined UI | Concept (node + "Coming soon" only) |
 | DevLens | Codebase → interactive visual understanding | Concept |
 | Fix | Error → explanation → actionable fix | Concept |

@@ -60,10 +60,6 @@ section{padding:18vh clamp(16px,4vw,40px)}
 .kv dt{color:var(--dim);font-size:13px}
 .kv dd{margin:0;word-break:break-word}
 #report .warn{color:var(--sig);font-size:14px;margin:8px 0 0}
-#report .embed{margin:18px 0 0;border:1px solid var(--line);border-radius:12px;overflow:hidden;background:#0b0d11}
-#report .embar{display:flex;gap:12px;align-items:center;justify-content:space-between;flex-wrap:wrap;padding:10px 14px;border-bottom:1px solid var(--line);font-size:13px;color:var(--dim)}
-#report .embar .btn{padding:6px 14px;font-size:13px}
-#report .embed iframe{display:block;width:100%;height:560px;border:0;background:#0b0d11}
 #url::placeholder{color:var(--dim);opacity:.85}
 .acts{display:flex;gap:10px;flex-wrap:wrap;margin-top:10px}
 .acts .btn{padding:10px 16px;font-size:14px}
@@ -119,7 +115,7 @@ section{padding:18vh clamp(16px,4vw,40px)}
 <div class="log" id="log" role="log" aria-live="polite" hidden></div>
 <div class="state" id="state" aria-live="polite"></div>
 <div id="report"></div>
-<p class="note">Launch reads a public GitHub repository and reports how it would be run. ONECLICK servers never install, build or run it. For Node.js projects you can run it inside this page through StackBlitz (a third-party service, in your own browser tab); other options open free cloud runners.</p>
+<p class="note">Launch reads a public GitHub repository and reports how it would be run. ONECLICK servers never install, build or run it. For Node.js projects, StackBlitz can run it in your browser in a new tab (a third-party service); other options open free cloud runners.</p>
 </div>
 </section>
 
@@ -167,27 +163,6 @@ async function streamAnalyze(url,onEv,signal){
 }
 function kv(dl,k,v){if(v==null||v==='')return;dl.appendChild(el('dt',null,k));dl.appendChild(el('dd',null,v))}
 const cmd=c=>c?c.cmd+' ('+c.confidence+')':null;
-const EMBED_URL=/^https:\/\/stackblitz\.com\/github\//; // only StackBlitz GitHub imports may be embedded
-function embedRun(x,opener){
- const old=document.getElementById('embed');if(old)old.remove();
- const oldn=document.getElementById('embnote');if(oldn)oldn.remove();
- if(!window.crossOriginIsolated){ // the in-browser runner cannot start without isolation (local file, Safari, missing headers)
-  window.open(x.url,'_blank','noopener,noreferrer');
-  const n=el('p','note','This page cannot host the runner inline here (it needs a Chromium or Firefox browser on the live site, not a local file), so StackBlitz was opened in a new tab.');n.id='embnote';rep.appendChild(n);return}
- const box=el('div','embed');box.id='embed';box.tabIndex=-1;
- const bar=el('div','embar');
- bar.appendChild(el('span',null,'Running in StackBlitz, inside your browser tab. Nothing runs on ONECLICK servers. Works best in Chrome or Edge.'));
- const close=el('button','btn ghost','Close');close.type='button';
- close.onclick=()=>{box.remove();if(opener)opener.focus()};
- const nt=el('a','btn ghost','Stuck? Open in a new tab');nt.href=x.url;nt.target='_blank';nt.rel='noopener noreferrer';
- bar.appendChild(nt);bar.appendChild(close);
- const f=document.createElement('iframe');
- f.src=x.url+(x.url.indexOf('?')<0?'?':'&')+'embed=1&hideNavigation=1';
- f.title='StackBlitz runner';f.loading='lazy';f.allow='cross-origin-isolated; clipboard-write';
- f.setAttribute('sandbox','allow-scripts allow-same-origin allow-forms allow-popups allow-modals allow-downloads');
- box.appendChild(bar);box.appendChild(f);rep.appendChild(box);box.focus();
- box.scrollIntoView({block:'nearest'});
-}
 function renderReport(r){
  rep.replaceChildren();const dl=el('dl','kv');
  kv(dl,'Repository',r.repo.owner+'/'+r.repo.name+' @ '+r.repo.branch);
@@ -203,9 +178,7 @@ function renderReport(r){
  r.warnings.forEach(w=>rep.appendChild(el('p','warn','! '+w)));
  const plan=r.runPlan,opts=((plan&&plan.options)||[]).filter(x=>RUN_URL.test(x.url)),acts=el('div','acts');
  const intro=plan&&plan.recommended?'Best free way to run it is highlighted. Each option opens a third-party service and uses your own free quota:':r.status==='LIBRARY'?'This is a library, so there is nothing to launch. You can still work with the code:':'No reliable way to run this was found. You can still open the code:';
- const sb=opts.find(x=>x.id==='stackblitz'&&EMBED_URL.test(x.url));
- if(sb){const rb=el('button','btn'+(plan.recommended==='stackblitz'?'':' ghost'),'Run it here \u00b7 StackBlitz');rb.type='button';rb.onclick=()=>embedRun(sb,rb);acts.appendChild(rb)}
- opts.forEach(x=>{const a=el('a','btn'+(x.id===plan.recommended&&!(sb&&x.id==='stackblitz')?'':' ghost'),x.label+' \u00b7 '+x.provider+(x.runs?'':' (editor only)'));a.href=x.url;a.target='_blank';a.rel='noopener noreferrer';acts.appendChild(a)});
+ opts.forEach(x=>{const a=el('a','btn'+(x.id===plan.recommended?'':' ghost'),x.label+' \u00b7 '+x.provider+(x.runs?'':' (editor only)'));a.href=x.url;a.target='_blank';a.rel='noopener noreferrer';acts.appendChild(a)});
  if(opts.length){rep.appendChild(el('p','note',intro));rep.appendChild(acts);
   opts.forEach(x=>{if(x.id===plan.recommended||x.fit==='maybe')(x.notes||[]).forEach(t=>rep.appendChild(el('p','note',x.provider+': '+t)))})}
  rep.appendChild(el('p','note',r.statusReason));
