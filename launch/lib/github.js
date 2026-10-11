@@ -105,6 +105,8 @@ function createGithubSource({ token, signal } = {}) {
         defaultBranch: r.default_branch,
         description: r.description || null,
         sizeKB: r.size || 0,
+        pushedAt: r.pushed_at || null,
+        license: r.license ? (r.license.spdx_id && r.license.spdx_id !== 'NOASSERTION' ? r.license.spdx_id : r.license.name || null) : null,
       };
     },
 

@@ -76,6 +76,18 @@ details.fail summary{cursor:pointer;color:var(--fg)}
 details.fail summary:focus-visible{outline:2px solid var(--sig);outline-offset:3px}
 details.fail .c{color:var(--fg);margin:10px 0 0;font-weight:500}
 details.fail .f{margin:2px 0 0}
+.hl{font-size:13.5px;margin:6px 0 0;color:var(--dim)}
+.hl.ok{color:var(--fg)}.hl.warn{color:var(--sig)}
+.picker{margin-top:14px}
+.picker .acts .btn{padding:8px 14px;font-size:13px}
+details.env{margin-top:14px;border:1px solid var(--line);border-radius:14px;padding:14px 16px;background:rgba(5,6,8,.55)}
+details.env summary{cursor:pointer;font-weight:500}
+details.env summary:focus-visible{outline:2px solid var(--sig);outline-offset:3px}
+.envrow{display:grid;grid-template-columns:minmax(120px,max-content) 1fr;gap:6px 12px;align-items:center;margin-top:10px}
+.envrow label{font:12.5px ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;color:var(--fg);word-break:break-all}
+.envrow label small{display:block;color:var(--dim);font:11.5px 'Bricolage Grotesque',system-ui,sans-serif}
+.sim .envrow input{min-width:0;padding:9px 10px;font-size:13px}
+@media(max-width:560px){.envrow{grid-template-columns:1fr}}
 @media(prefers-reduced-motion:reduce){html{scroll-behavior:auto}*{transition:none!important;animation:none!important}}
 </style>
 </head>
@@ -152,8 +164,8 @@ const STATE={READY:'ANALYZED: READY TO RUN',PARTIAL:'ANALYZED: PARTIAL',LIBRARY:
 const RUN_URL=/^https:\/\/(stackblitz\.com|codespaces\.new|github\.dev|vercel\.com|raw\.githack\.com)\//; // only ever link to the known runner hosts
 function addLog(level,msg){logEl.appendChild(el('div',level,(MARK[level]||'-')+' '+msg));logEl.scrollTop=logEl.scrollHeight}
 fetch(API_BASE+'/api/health').catch(()=>{}); // wakes the free-tier server early
-async function streamAnalyze(url,onEv,signal){
- const res=await fetch(API_BASE+'/api/analyze/stream?url='+encodeURIComponent(url),{signal});
+async function streamAnalyze(url,dir,onEv,signal){
+ const res=await fetch(API_BASE+'/api/analyze/stream?url='+encodeURIComponent(url)+(dir?'&dir='+encodeURIComponent(dir):''),{signal});
  if(!res.ok){let m='Request failed ('+res.status+').';try{m=(await res.json()).error.message}catch{}throw new Error(m)}
  const rd=res.body.getReader(),dec=new TextDecoder();let buf='';
  for(;;){const {done,value}=await rd.read();if(done)break;buf+=dec.decode(value,{stream:true});
@@ -164,8 +176,22 @@ async function streamAnalyze(url,onEv,signal){
 function kv(dl,k,v){if(v==null||v==='')return;dl.appendChild(el('dt',null,k));dl.appendChild(el('dd',null,v))}
 const cmd=c=>c?c.cmd+' ('+c.confidence+')':null;
 const SEV={blocks:'Will not work here',limits:'May not work fully',needs:'You need to supply'};
-function copyBtn(text,label='Copy'){const b=el('button','copy',label);b.type='button';b.setAttribute('aria-label',label==='Copy'?'Copy to clipboard':label);
- b.addEventListener('click',async()=>{try{await navigator.clipboard.writeText(text);b.textContent='Copied'}catch{b.textContent='Copy failed'}setTimeout(()=>{b.textContent=label},1600)});return b}
+function copyBtn(text,label='Copy'){const get=typeof text==='function'?text:()=>text;const b=el('button','copy',label);b.type='button';b.setAttribute('aria-label',label==='Copy'?'Copy to clipboard':label);
+ b.addEventListener('click',async()=>{try{await navigator.clipboard.writeText(get());b.textContent='Copied'}catch{b.textContent='Copy failed'}setTimeout(()=>{b.textContent=label},1600)});return b}
+/*envfile:start*/
+function envQuote(v){if(/^[A-Za-z0-9_@%+=:,.\/-]*$/.test(v))return v;if(v.indexOf("'")<0)return "'"+v+"'";return '"'+v.replace(/"/g,'\\"')+'"'}
+function buildEnvFile(vars,values){const out=vars.map(v=>{const raw=values&&values[v.name]!=null?String(values[v.name]):'';return v.name+'='+envQuote(raw.replace(/[\r\n]+/g,' ').trim())});return out.join('\n')+(out.length?'\n':'')}
+/*envfile:end*/
+function downloadText(name,text){const b=new Blob([text],{type:'text/plain'}),a=document.createElement('a');a.href=URL.createObjectURL(b);a.download=name;document.body.appendChild(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(a.href),1000)}
+function envSection(vars,cwd){
+ const d=el('details','env');d.appendChild(el('summary',null,'Set up environment variables ('+vars.length+')'));
+ d.appendChild(el('p','note','Launch found these names in the repository. Fill in the ones you have, then copy or download a .env file and put it in '+(cwd&&cwd!=='.'?'the "'+cwd+'" folder':'the project folder')+'. Values stay in this page and are never sent to ONECLICK. Do not commit the file to Git. If your browser saves the download as "env", rename it to .env.'));
+ const inputs={},values=()=>{const o={};vars.forEach(v=>{o[v.name]=inputs[v.name].value});return o};
+ vars.forEach(v=>{const row=el('div','envrow'),lab=el('label',null,v.name);lab.htmlFor='env-'+v.name;lab.appendChild(el('small',null,v.inExample?'listed in the repository\u2019s example file':'found in the code'));
+  const inp=el('input');inp.id='env-'+v.name;inp.type='text';inp.autocomplete='off';inp.spellcheck=false;inp.setAttribute('aria-label',v.name+' value');inputs[v.name]=inp;row.appendChild(lab);row.appendChild(inp);d.appendChild(row)});
+ const acts=el('div','acts');acts.appendChild(copyBtn(()=>buildEnvFile(vars,values()),'Copy .env'));
+ const dl=el('button','copy','Download .env');dl.type='button';dl.addEventListener('click',()=>downloadText('.env',buildEnvFile(vars,values())));acts.appendChild(dl);
+ d.appendChild(acts);return d}
 function optionCard(x,best){
  const card=el('div','opt'+(best?' best':'')),acts=el('div','acts'),a=el('a','btn'+(best?'':' ghost'),x.label+' \u00b7 '+x.provider+(x.runs?'':' (editor only)'));
  a.href=x.url;a.target='_blank';a.rel='noopener noreferrer';acts.appendChild(a);card.appendChild(acts);
@@ -193,20 +219,25 @@ function renderReport(r){
  kv(dl,'Environment',r.env.vars.length?r.env.vars.map(v=>v.name).join(', '):'None found');
  rep.appendChild(dl);
  r.warnings.forEach(w=>rep.appendChild(el('p','warn','! '+w)));
+ if(r.health&&r.health.items)r.health.items.forEach(h=>rep.appendChild(el('p','hl '+h.level,({ok:'+ ',warn:'! ',info:'- '}[h.level]||'- ')+h.text)));
+ if(r.projects&&r.projects.length>1){const pk=el('div','picker'),cur=r.projects.find(p=>p.selected);
+  pk.appendChild(el('p','note','This repository contains '+r.projects.length+' projects'+(cur?'; showing "'+(cur.dir==='.'?'repository root':cur.dir)+'"':'')+'. Analyze a different one:'));
+  const pa=el('div','acts');r.projects.filter(p=>!p.selected).forEach(p=>{const b=el('button','btn ghost',p.dir==='.'?'Repository root':p.dir);b.type='button';b.title=p.manifest;b.addEventListener('click',()=>runAnalysis(urlIn.value,p.dir));pa.appendChild(b)});pk.appendChild(pa);rep.appendChild(pk)}
  const plan=r.runPlan,opts=((plan&&plan.options)||[]).filter(x=>RUN_URL.test(x.url));
  const intro=plan&&plan.recommended?'Each option opens a third-party service and uses your own free quota. The suggested one has the amber outline. Anything Launch found that could stop an option from working is listed under it:':r.status==='LIBRARY'?'This is a library, so there is nothing to launch. You can still work with the code:':'No reliable way to run this was found. You can still open the code:';
  if(opts.length){rep.appendChild(el('p','note',intro));
   opts.filter(x=>x.id===plan.recommended).concat(opts.filter(x=>x.id!==plan.recommended)).forEach(x=>rep.appendChild(optionCard(x,x.id===plan.recommended)))}
+ if(r.env&&r.env.vars&&r.env.vars.length)rep.appendChild(envSection(r.env.vars,r.project&&r.project.root));
  rep.appendChild(el('p','note',r.statusReason));
- if(location.protocol!=='file:'){const row=el('div','acts');row.appendChild(copyBtn(location.href.split(/[?#]/)[0]+'?repo='+encodeURIComponent(urlIn.value.trim()||r.repo.owner+'/'+r.repo.name),'Copy link to this analysis'));rep.appendChild(row)}
+ if(location.protocol!=='file:'){const row=el('div','acts');row.appendChild(copyBtn(location.href.split(/[?#]/)[0]+'?repo='+encodeURIComponent(urlIn.value.trim()||r.repo.owner+'/'+r.repo.name)+(lastDir?'&dir='+encodeURIComponent(lastDir):''),'Copy link to this analysis'));rep.appendChild(row)}
 }
-let busy=false;
-document.getElementById('sf').addEventListener('submit',async e=>{
- e.preventDefault();if(busy)return;busy=true;go.disabled=true;st.textContent='';rep.replaceChildren();logEl.replaceChildren();logEl.hidden=false;
+let busy=false,lastDir='';
+async function runAnalysis(input,dir){
+ if(busy)return;busy=true;lastDir=dir||'';go.disabled=true;st.textContent='';rep.replaceChildren();logEl.replaceChildren();logEl.hidden=false;
  const ac=new AbortController(),kill=setTimeout(()=>ac.abort(),90000);let got=false;
  const wake=setTimeout(()=>{if(!got)addLog('info','Waking the server (free hosting). This can take up to a minute.')},3000);
  try{
-  await streamAnalyze(urlIn.value,(ev,d)=>{got=true;
+  await streamAnalyze(input,dir,(ev,d)=>{got=true;
    if(ev==='log')addLog(d.level,d.msg);
    else if(ev==='result'){renderReport(d);st.textContent=STATE[d.status]||'ANALYZED'}
    else if(ev==='error'){st.textContent='COULD NOT ANALYZE';if(!logEl.querySelector('.err'))addLog('err',d.message)}
@@ -215,9 +246,10 @@ document.getElementById('sf').addEventListener('submit',async e=>{
   st.textContent='COULD NOT ANALYZE';
   addLog('err',ac.signal.aborted?'The server took too long to respond. Try again in a minute.':(err instanceof TypeError?'Could not reach the Launch server. Try again in a minute.':err.message));
  }finally{clearTimeout(kill);clearTimeout(wake);busy=false;go.disabled=false}
-});
-// shared link: launch.html?repo=owner/repo runs the analysis on load (the server validates the input)
-(function(){const q=new URLSearchParams(location.search).get('repo');if(q&&q.length<=200){urlIn.value=q;document.getElementById('sf').requestSubmit()}})();
+}
+document.getElementById('sf').addEventListener('submit',e=>{e.preventDefault();runAnalysis(urlIn.value,'')});
+// shared link: launch.html?repo=owner/repo[&dir=folder] runs the analysis on load (the server validates both)
+(function(){const p=new URLSearchParams(location.search),q=p.get('repo'),d=p.get('dir');if(q&&q.length<=300){urlIn.value=q;runAnalysis(q,d&&d.length<=200?d:'')}})();
 </script>
 </body>
 </html>

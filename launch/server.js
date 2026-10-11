@@ -3,8 +3,8 @@
 // ONECLICK Launch API. Zero dependencies.
 //
 //   GET  /api/health
-//   POST /api/analyze          body: {"url": "..."}  -> JSON report (never runs repository code)
-//   GET  /api/analyze/stream?url=...                 -> Server-Sent Events
+//   POST /api/analyze          body: {"url": "...", "dir": "optional/folder"}  -> JSON report (never runs repository code)
+//   GET  /api/analyze/stream?url=...&dir=...         -> Server-Sent Events
 //
 // Optional sandbox (off by default; needs Docker, see sandbox/README.md). Repository code only
 // ever runs inside a locked-down container, never in this process.
@@ -36,6 +36,8 @@ const TRUST_PROXY = process.env.TRUST_PROXY === '1'; // set behind Render/other 
 
 const STATUS_BY_CODE = {
   invalid_url: 400,
+  invalid_dir: 400,
+  dir_not_found: 404,
   not_found: 404,
   private_repo: 403,
   forbidden: 403,
@@ -190,16 +192,19 @@ async function handle(req, res, ctx) {
   if (url.pathname === '/api/analyze' && req.method === 'POST') {
     if (limited(ip)) return send(res, 429, { error: { code: 'rate_limited', message: 'Too many requests. Try again in a minute.' } }, { 'Retry-After': '60' });
     let input;
+    let dirParam;
     try {
       const raw = await readBody(req);
-      input = JSON.parse(raw || '{}').url;
+      const body = JSON.parse(raw || '{}');
+      input = body.url;
+      dirParam = typeof body.dir === 'string' ? body.dir : undefined;
     } catch (e) {
       return send(res, e.code === 'too_large' ? 413 : 400, { error: { code: 'bad_request', message: e.code === 'too_large' ? 'Request body too large.' : 'Body must be JSON: {"url": "..."}.' } });
     }
     const signal = clientSignal(req, res);
     try {
       const source = createGithubSource({ token: process.env.GITHUB_TOKEN, signal });
-      const result = await analyze(input, { source, signal });
+      const result = await analyze(input, { source, signal, dir: dirParam });
       return send(res, 200, result);
     } catch (e) {
       const { status, body } = errorBody(e);
@@ -221,7 +226,7 @@ async function handle(req, res, ctx) {
     const signal = clientSignal(req, res);
     try {
       const source = createGithubSource({ token: process.env.GITHUB_TOKEN, signal });
-      const result = await analyze(url.searchParams.get('url'), { source, signal, emit: (ev) => write(ev.type, ev) });
+      const result = await analyze(url.searchParams.get('url'), { source, signal, dir: url.searchParams.get('dir') ?? undefined, emit: (ev) => write(ev.type, ev) });
       write('result', result);
     } catch (e) {
       write('error', errorBody(e).body.error);

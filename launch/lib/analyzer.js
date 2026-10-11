@@ -1,9 +1,10 @@
 'use strict';
 
-const { parseRepoUrl } = require('./url');
+const { parseRepoUrl, parseDir } = require('./url');
 const { DETECTORS } = require('./detectors');
 const { planRun } = require('./runners');
 const { checkPreviewHtml } = require('./preview');
+const { buildHealth } = require('./health');
 
 class AnalysisError extends Error {
   constructor(code, message, extra) {
@@ -52,15 +53,19 @@ async function pool(items, size, fn) {
 function findBase(paths) {
   let best = null;
   const dirs = new Set();
+  const manifests = new Map();
   for (const p of paths) {
     const segs = p.split('/');
     const name = segs.pop();
     if (!MANIFEST_NAMES.has(name) && !/\.csproj$/.test(name)) continue;
     if (segs.length > 2 || segs.some((s) => SKIP_SEG.has(s))) continue;
     dirs.add(segs.join('/'));
+    if (!manifests.has(segs.join('/'))) manifests.set(segs.join('/'), name);
     if (!best || segs.length < best.depth || (segs.length === best.depth && p.length < best.len)) best = { depth: segs.length, dir: segs.join('/'), len: p.length };
   }
-  return { dir: best ? best.dir : null, others: [...dirs].filter((d) => d !== (best && best.dir)).slice(0, 5) };
+  const depth = (d) => (d ? d.split('/').length : 0);
+  const projects = [...manifests].map(([dir, manifest]) => ({ dir, manifest })).sort((a, b) => depth(a.dir) - depth(b.dir) || a.dir.localeCompare(b.dir)).slice(0, 20);
+  return { dir: best ? best.dir : null, others: [...dirs].filter((d) => d !== (best && best.dir)).slice(0, 5), projects };
 }
 
 function parseEnvExample(text) {
@@ -81,7 +86,7 @@ function scoreSource(p) {
   return s;
 }
 
-async function analyze(input, { emit = () => {}, source, signal } = {}) {
+async function analyze(input, { emit = () => {}, source, signal, dir: dirOpt } = {}) {
   const log = (level, msg) => emit({ type: 'log', level, msg });
   const stage = (status) => emit({ type: 'stage', id: 'analyzing', status });
   const fail = (code, message, extra) => {
@@ -134,16 +139,40 @@ async function analyze(input, { emit = () => {}, source, signal } = {}) {
 
   // 4. locate project root
   log('cmd', 'Locating project manifests');
-  const { dir, others } = findBase(paths);
-  let base = dir;
+  const found4 = findBase(paths);
+  const others = found4.others;
+  // a folder can be chosen explicitly (monorepo picker or a pasted /tree/branch/folder URL); '.' means the repo root
+  const wantDir = dirOpt != null ? dirOpt : parsed.dir;
+  let dirSel = null;
+  if (wantDir != null) {
+    const d = parseDir(wantDir);
+    if (!d.ok) throw fail('invalid_dir', d.error);
+    dirSel = d.dir;
+  }
+  const explicit = dirSel !== null;
+  let dir = found4.dir;
+  let base;
   let staticSite = false;
-  if (base === null) {
-    base = '';
-    if (paths.has('index.html')) staticSite = true;
+  if (explicit) {
+    if (dirSel && ![...paths].some((p) => p.startsWith(dirSel + '/'))) throw fail('dir_not_found', `The folder "${dirSel}" was not found on branch "${ref}".`);
+    base = dirSel;
+    const direct = [...paths].filter((p) => (base ? p.startsWith(base + '/') : true)).map((p) => (base ? p.slice(base.length + 1) : p)).filter((p) => !p.includes('/'));
+    const hasManifest = direct.some((n) => MANIFEST_NAMES.has(n) || /\.csproj$/.test(n));
+    dir = hasManifest ? base : null;
+    if (!hasManifest && direct.includes('index.html')) staticSite = true;
+    log('ok', `Analyzing ${base ? `folder "${base}"` : 'the repository root'}`);
+  } else {
+    base = dir;
+    if (base === null) {
+      base = '';
+      if (paths.has('index.html')) staticSite = true;
+    }
   }
   const at = (n) => (base ? `${base}/${n}` : n);
   const rel = (p) => (base ? p.slice(base.length + 1) : p);
-  if (dir !== null) {
+  if (explicit) {
+    if (dir === null && !staticSite) log('info', 'No supported project manifest found in this folder');
+  } else if (dir !== null) {
     if (dir !== '') {
       warn(`No manifest at the repository root. Analyzing subdirectory "${dir}".`);
     }
@@ -304,7 +333,9 @@ async function analyze(input, { emit = () => {}, source, signal } = {}) {
 
   const cmdOut = (c) => (c ? { cmd: c.cmd, source: c.source, confidence: c.confidence } : null);
   return {
-    repo: { owner, name: meta.name || repo, url: parsed.canonical, branch: ref, description: meta.description, sizeKB: meta.sizeKB, archived: meta.archived, fork: meta.fork, treeTruncated: tree.truncated },
+    repo: { owner, name: meta.name || repo, url: parsed.canonical, branch: ref, description: meta.description, sizeKB: meta.sizeKB, archived: meta.archived, fork: meta.fork, pushedAt: meta.pushedAt || null, license: meta.license || null, treeTruncated: tree.truncated },
+    health: buildHealth(meta, paths),
+    projects: found4.projects.map((p) => ({ dir: p.dir || '.', manifest: p.manifest, selected: p.dir === base })),
     project: { name: (primary && primary.name) || meta.name || repo, root: base || '.' },
     language: primary ? primary.language : docker.dockerfile ? 'Docker' : staticSite ? 'HTML' : null,
     runtime: primary ? primary.runtime : null,
