@@ -112,11 +112,16 @@ test('library: honest status, no start command, no best option', async () => {
   assert.equal(r.entryPoint.path, 'index.js');
 });
 
-test('static site: a library with a root demo page is previewable; a nested index.html alone is not claimed', async () => {
+test('static site: a library with a root demo page is previewable; a nested page counts only without server-side code', async () => {
   // by design (particles.js case): a package that also ships index.html at its root counts as a static demo
   const withManifest = await run({ 'index.html': '<html></html>', 'package.json': pkg({ name: 'x', scripts: { test: 'x' } }) });
   assert.equal(withManifest.projectType, 'Static site');
   assert.equal(withManifest.project.root, '.');
+  // a nested page in a repo with no code is a plain static site (e.g. a docs or student-project folder)
   const nested = await run({ 'docs/index.html': '<html></html>', 'README.md': 'hi' });
-  assert.notEqual(nested.projectType, 'Static site');
+  assert.equal(nested.projectType, 'Static site');
+  assert.equal(nested.project.root, 'docs');
+  // but the same page next to server-side source is not claimed
+  const backend = await run({ 'docs/index.html': '<html></html>', 'main.go': 'package main' });
+  assert.notEqual(backend.projectType, 'Static site');
 });

@@ -68,6 +68,42 @@ function findBase(paths) {
   return { dir: best ? best.dir : null, others: [...dirs].filter((d) => d !== (best && best.dir)).slice(0, 5), projects };
 }
 
+const HTML_RE = /\.html?$/i;
+const STATIC_SKIP = new Set(['node_modules', '.git', 'vendor', '.github']);
+const PAGE_PREF = ['index.html', 'index.htm', 'home.html', 'home.htm', 'default.html', 'default.htm', 'main.html', 'main.htm'];
+const SERVER_SRC = /\.(py|rb|go|java|rs|php|cs|c|cc|cpp|h|kt|swift)$/i;
+
+// The page a plain static site would open. Shallowest first, then conventional names; matching is
+// case-insensitive (Index.html, INDEX.HTM). A conventionally named root page is enough on its own; any
+// other page (nested, or oddly named) only counts when the repo has no server-side source code, so a
+// backend project that merely ships a docs page is not mistaken for a static site.
+function findStaticPage(list, maxDepth, hasServerSrc) {
+  let best = null;
+  for (const p of list) {
+    if (!HTML_RE.test(p)) continue;
+    const segs = p.split('/');
+    const name = segs.pop();
+    if (segs.length > maxDepth || segs.some((s) => STATIC_SKIP.has(s) || s.startsWith('.'))) continue;
+    const pref = PAGE_PREF.indexOf(name.toLowerCase());
+    if (!(segs.length === 0 && (pref === 0 || pref === 1)) && hasServerSrc) continue;
+    const cand = { dir: segs.join('/'), file: name, depth: segs.length, rank: pref < 0 ? PAGE_PREF.length : pref, len: p.length };
+    if (!best || cand.depth < best.depth || (cand.depth === best.depth && (cand.rank < best.rank || (cand.rank === best.rank && cand.len < best.len)))) best = cand;
+  }
+  return best;
+}
+
+// What is actually in the repository, so an unsupported result can say why.
+function inventory(files) {
+  const counts = new Map();
+  for (const f of files) {
+    const m = f.path.match(/\.([A-Za-z0-9]{1,8})$/);
+    if (m) counts.set('.' + m[1].toLowerCase(), (counts.get('.' + m[1].toLowerCase()) || 0) + 1);
+  }
+  const byType = [...counts].sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0])).slice(0, 6).map(([ext, count]) => ({ ext, count }));
+  return { total: files.length, byType, topLevel: [...new Set(files.map((f) => f.path.split('/')[0]))].sort().slice(0, 12) };
+}
+const inventoryText = (inv) => `${inv.total} file${inv.total === 1 ? '' : 's'}${inv.byType.length ? ': ' + inv.byType.map((t) => `${t.count} ${t.ext}`).join(', ') : ''}`;
+
 function parseEnvExample(text) {
   const out = [];
   for (const line of text.split(/\r?\n/)) {
@@ -153,19 +189,30 @@ async function analyze(input, { emit = () => {}, source, signal, dir: dirOpt } =
   let dir = found4.dir;
   let base;
   let staticSite = false;
+  let staticFile = null;
+  const hasServerSrc = files.some((f) => SERVER_SRC.test(f.path));
   if (explicit) {
     if (dirSel && ![...paths].some((p) => p.startsWith(dirSel + '/'))) throw fail('dir_not_found', `The folder "${dirSel}" was not found on branch "${ref}".`);
     base = dirSel;
     const direct = [...paths].filter((p) => (base ? p.startsWith(base + '/') : true)).map((p) => (base ? p.slice(base.length + 1) : p)).filter((p) => !p.includes('/'));
     const hasManifest = direct.some((n) => MANIFEST_NAMES.has(n) || /\.csproj$/.test(n));
     dir = hasManifest ? base : null;
-    if (!hasManifest && direct.includes('index.html')) staticSite = true;
+    const sp = hasManifest ? null : findStaticPage(direct, 0, hasServerSrc);
+    if (sp) {
+      staticSite = true;
+      staticFile = sp.file;
+    }
     log('ok', `Analyzing ${base ? `folder "${base}"` : 'the repository root'}`);
   } else {
     base = dir;
     if (base === null) {
       base = '';
-      if (paths.has('index.html')) staticSite = true;
+      const sp = findStaticPage([...paths], 2, hasServerSrc);
+      if (sp) {
+        staticSite = true;
+        staticFile = sp.file;
+        base = sp.dir;
+      }
     }
   }
   const at = (n) => (base ? `${base}/${n}` : n);
@@ -225,9 +272,10 @@ async function analyze(input, { emit = () => {}, source, signal, dir: dirOpt } =
   } else if (docker.dockerfile) {
     log('ok', 'Dockerfile found');
   } else if (staticSite) {
-    log('ok', 'index.html found (static site)');
+    log('ok', `${staticFile} found${base ? ` in "${base}"` : ''} (static site)`);
   } else {
-    warn('Could not detect a supported stack. Supported: Node.js, Python, Java, Go, Rust, Ruby, PHP, .NET.');
+    warn('Could not detect a supported stack. Supported: Node.js, Python, Java, Go, Rust, Ruby, PHP (with composer.json), .NET.');
+    log('info', `This repository contains ${inventoryText(inventory(files))}.`);
   }
   if (docker.dockerfile) log('ok', `Dockerfile found${docker.expose.length ? ` (exposes ${docker.expose.join(', ')})` : ''}`);
 
@@ -278,7 +326,7 @@ async function analyze(input, { emit = () => {}, source, signal, dir: dirOpt } =
     }
   }
   if (demoPage) previewPath = demoPage;
-  else if (staticSite && !primary) previewPath = 'index.html';
+  else if (staticSite && !primary) previewPath = staticFile || 'index.html';
 
   // Read the page itself (small, read-only) so the preview option can name concrete problems up front.
   let previewIssues = [];
@@ -294,7 +342,7 @@ async function analyze(input, { emit = () => {}, source, signal, dir: dirOpt } =
   let statusReason;
   if (!primary && !docker.dockerfile && !staticSite) {
     status = 'UNKNOWN';
-    statusReason = 'No supported project type was detected.';
+    statusReason = `No supported project type was detected. This repository contains ${inventoryText(inventory(files))}, but no project file Launch knows how to read (such as package.json or requirements.txt) and no web page it can open directly.`;
   } else if (primary && primary.projectType === 'Library or package' && !primary.start && !primary.staticOutput) {
     status = 'LIBRARY';
     statusReason = 'This is a library or package, not an application. There is no application entry point to launch.';
@@ -305,7 +353,7 @@ async function analyze(input, { emit = () => {}, source, signal, dir: dirOpt } =
       : 'Stack and a run command were found. This is an analysis result; the project has not been built or run.';
   } else if (docker.dockerfile || staticSite) {
     status = 'READY';
-    statusReason = staticSite ? 'Static site: index.html found. This is an analysis result only.' : 'A Dockerfile was found. This is an analysis result; the image has not been built.';
+    statusReason = staticSite ? `Static site: ${staticFile} found. This is an analysis result only.` : 'A Dockerfile was found. This is an analysis result; the image has not been built.';
   } else {
     status = 'PARTIAL';
     statusReason = 'Stack detected, but no start command could be determined.';
@@ -335,6 +383,7 @@ async function analyze(input, { emit = () => {}, source, signal, dir: dirOpt } =
   return {
     repo: { owner, name: meta.name || repo, url: parsed.canonical, branch: ref, description: meta.description, sizeKB: meta.sizeKB, archived: meta.archived, fork: meta.fork, pushedAt: meta.pushedAt || null, license: meta.license || null, treeTruncated: tree.truncated },
     health: buildHealth(meta, paths),
+    inventory: inventory(files),
     projects: found4.projects.map((p) => ({ dir: p.dir || '.', manifest: p.manifest, selected: p.dir === base })),
     project: { name: (primary && primary.name) || meta.name || repo, root: base || '.' },
     language: primary ? primary.language : docker.dockerfile ? 'Docker' : staticSite ? 'HTML' : null,

@@ -217,6 +217,7 @@ function renderReport(r){
  kv(dl,'Build',cmd(r.commands.build));
  kv(dl,'Start',cmd(r.commands.start)||(r.staticOutput?'Static output: '+r.staticOutput:null));
  kv(dl,'Environment',r.env.vars.length?r.env.vars.map(v=>v.name).join(', '):'None found');
+ kv(dl,'Files',r.inventory?r.inventory.total+' file'+(r.inventory.total===1?'':'s')+(r.inventory.byType.length?': '+r.inventory.byType.map(t=>t.count+' '+t.ext).join(', '):''):null);
  rep.appendChild(dl);
  r.warnings.forEach(w=>rep.appendChild(el('p','warn','! '+w)));
  if(r.health&&r.health.items)r.health.items.forEach(h=>rep.appendChild(el('p','hl '+h.level,({ok:'+ ',warn:'! ',info:'- '}[h.level]||'- ')+h.text)));
